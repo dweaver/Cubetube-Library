@@ -3,14 +3,18 @@
 
 #include <math.h>
 
+// Set these based on provisioning using
+// token/CIK and endpoint.
+
 Cube cube = Cube();
 unsigned int nextTime = 0;    // Next time to contact the server
 unsigned int READ_INTERVAL = 3000;
 HttpClient http;
+String lastResponse = "";
 
 // Headers currently need to be set at init, useful for API keys etc.
 http_header_t headers[] = {
-    { "X-Exosite-CIK", "b233de12fab2203721d53de63c9a7882a48058da" },
+    { "X-Exosite-CIK", "jCUduZV6swydBT5ZN7kzjDahRcP5h4CVFhcExMkH" },
     { "Content-Type", "application/x-www-form-urlencoded; charset=utf-8" },
     { "Accept" , "application/x-www-form-urlencoded; charset=utf-8" },
     { NULL, NULL } // NOTE: Always terminate headers will NULL
@@ -33,7 +37,7 @@ void setup()
 
 void loop()
 {
-	String voxel;
+	String voxels;
 	if (nextTime > millis()) {
 		delay(10);
 		return;
@@ -41,9 +45,9 @@ void loop()
     Serial.println();
     Serial.println("Application>\tStart of Loop.");
     // Request path and body can be set at runtime or at setup.
-    request.hostname = "r6tgd79vme80vn29.m2.exosite-dev.io";
+    request.hostname = "x542tl8ai0gg8kck0.devmode-m2.exosite.io";
     request.port = 80;
-    request.path = "/onep:v1/stack/alias?voxel";
+    request.path = "/onep:v1/stack/alias?voxels";
 
     // The library also supports sending a body with your request:
     //request.body = "{\"key\":\"value\"}";
@@ -59,30 +63,113 @@ void loop()
 	if (response.status == 200) {
 		// Write a voxel 
 	 	
-		// 6 -- remove "voxel="
-		voxel = urldecode(response.body.substring(6));
-		Serial.println("Decoded voxel to:" + voxel);
-	    setVoxel(voxel);
+		// 7 -- remove "voxels="
+		voxels = urldecode(response.body.substring(7));
+		Serial.println("Decoded voxels to:" + voxels);
+	    setVoxels(voxels);
 	} else {
 		// cube.background(red);
 	}
 
-	// Write accelerometer data and received voxel value back
-    request.path = "/onep:v1/stack/alias";
-	// get latest accelerometer values
-	cube.updateAccelerometer();
-	request.body = String(response.body + "&accelerometer=" + 
-		urlencode(
-			String(cube.accelerometerX, DEC) + "," + 
-			String(cube.accelerometerY, DEC) + "," + 
-			String(cube.accelerometerZ, DEC)));
-	http.post(request, response, headers);
-    Serial.print("Application>\tHTTP POST response status: ");
-    Serial.println(response.status);
+    if (lastResponse != response.body) {
+        // Write accelerometer data and received voxel value back
+        request.path = "/onep:v1/stack/alias";
+        // get latest accelerometer values
+        cube.updateAccelerometer();
+        request.body = String(response.body + "&accelerometer=" + 
+            urlencode(
+                String(cube.accelerometerX, DEC) + "," + 
+                String(cube.accelerometerY, DEC) + "," + 
+                String(cube.accelerometerZ, DEC)));
+        http.post(request, response, headers);
+        Serial.print("Application>\tHTTP POST response status: ");
+        Serial.println(response.status);
+    }
 
     nextTime = millis() + READ_INTERVAL;
 }
 
+/*******************************************************************************
+ * Function Name  : setVoxels
+ * Description    : updates voxels in 8x8x8 cube space
+ * Input          : string of length 512 describing color using single character
+ * Output         : None.
+ * Return         : 1 on success and a negative number on failure
+ *******************************************************************************/
+int setVoxels(String command)
+{
+  Color color;
+  const char* commandChar = command.c_str();
+  unsigned int i = 0;
+  for (unsigned int x = 0; x <= 7; x++) {
+      for (unsigned int y = 0; y <= 7; y++) {
+          for (unsigned int z = 0; z <= 7; z++) {
+              char ch = commandChar[i];
+              switch (ch) {
+                case '0':
+                    color = Color(0, 0, 0);
+                    break;
+                case '1':
+                    // Red
+                    color = Color(255, 0, 0);
+                    break;
+                case '2':
+                    // Green
+                    color = Color(0, 255, 0);
+                    break;
+                case '3':
+                    // Blue
+                    color = Color(0, 0, 255);
+                    break;
+                case '4':
+                    // Yellow
+                    color = Color(255, 255, 0);
+                    break;
+                case '5':
+                    // Cyan
+                    color = Color(0, 255, 255);
+                    break;
+                case '6':
+                    // Magenta
+                    color = Color(255, 0, 255);
+                    break;
+                case '7':
+                    // Gray
+                    color = Color(120, 120, 120);
+                    break;
+                case '8':
+                    // Orange
+                    color = Color(255, 165, 0);
+                    break;
+                case '9':
+                    // ExoBlue
+                    color = Color(65, 196, 220);
+                    break;
+                case 'a':
+                    // ExoNavy
+                    color = Color(34, 39, 54);
+                    break;
+                case 'b':
+                    // ExoGray
+                    color = Color(92, 93, 96);
+                    break;
+                case 'c':
+                    // White
+                    color = Color(255, 255, 255);
+                    break;
+                default:
+                    color = Color(255, 255, 255);
+                    break;
+              }
+              cube.setVoxel(x, y, z, color);
+              i++;
+          }
+      }
+  }
+  cube.show();
+
+  return 1;
+}
 
 /*******************************************************************************
  * Function Name  : setVoxel 
@@ -115,7 +202,7 @@ String urldecode(String str)
     char c;
     char code0;
     char code1;
-    for (int i =0; i < str.length(); i++){
+    for (unsigned int i =0; i < str.length(); i++){
         c=str.charAt(i);
       if (c == '+'){
         encodedString+=' ';  
@@ -144,7 +231,7 @@ String urlencode(String str)
     char code0;
     char code1;
     char code2;
-    for (int i =0; i < str.length(); i++){
+    for (unsigned int i =0; i < str.length(); i++){
       c=str.charAt(i);
       if (c == ' '){
         encodedString+= '+';
