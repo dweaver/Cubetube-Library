@@ -161,6 +161,17 @@ int setVoxels(String command)
                     color = Color(255, 255, 255);
                     break;
               }
+
+              /* for debugging
+              if (ch != '0') {
+                  Serial.print(x);
+                  Serial.print(",");
+                  Serial.print(y);
+                  Serial.print(",");
+                  Serial.print(z);
+                  Serial.print(":");
+                  Serial.println(ch);
+              }*/
               cube.setVoxel(x, y, z, color);
               i++;
           }
